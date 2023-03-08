@@ -1,4 +1,4 @@
-######
+###### packages for shiny logic
 library(shiny)
 library(shinyWidgets)
 library(DT)
@@ -8,30 +8,37 @@ library(shinycssloaders)
 library(flextable)
 library(DT)
 library(htmltools)
-######
 
-######
+###### packages for data process/viz/forecast
+
 library(data.table)
 library(ggplot2)
-
-load('dataFiltered.RData')
-
-dat[,Year:=year(date)]
-dat[,Month:=month(date)]
-dat[,Week:=week(date)]
-dat[,Month:=paste(Year,sprintf('%02d',Month),sep="-")]
-dat[,Week:=paste(Year,sprintf('%02d',Week),sep="-")]
-dat[,Day:=date]
-
-countries<-setNames(
-c('CN','US','JP','DE','GB','IN'),
-c('China','United States','Japan','Germany','United Kingdom','India'))
-
-countries<-as.data.table(countries,keep=T)
-
-names(countries)<-c('country','location_key')
+library(xts)
+library(tseries)
+library(zoo)
+library(forecast)
 
 
+###### data and some mutate
+load("dataFiltered.RData")
+
+dat[, Year := year(date)]
+dat[, Month := month(date)]
+dat[, Week := week(date)]
+dat[, Month := paste(Year, sprintf("%02d", Month), sep = "-")]
+dat[, Week := paste(Year, sprintf("%02d", Week), sep = "-")]
+dat[, Day := date]
+dat <- dat[order(date)]
+
+countries <- setNames(c("CN", "US", "JP", "DE", "GB", "IN"), 
+                      c("China",  "United States", "Japan", "Germany", "United Kingdom", "India"))
+
+countries <- as.data.table(countries, keep = T)
+
+names(countries) <- c("country", "location_key")
+
+
+#################ui logic 
 
 ui<-navbarPage(
   id = "zongPage",
@@ -43,25 +50,29 @@ ui<-navbarPage(
   ### css
   tags$head(
     tags$style(HTML("
-
-	ul#navBar2 {
-    float: right !important;
-    }
-	 
-    body {padding-top: 60px!important;}
-	 
-	.shiny-output-error { visibility: hidden; }
-	
-	.shiny-output-error:before { visibility: hidden; }
-    ")),
+	            .ollist {
+	            list-style-type: upper-roman; 
+	            line-height: 1.8;
+                margin-left: -20px;
+	            }
+	            
+	            ul#navBar2 {
+                float: right !important;
+                }
+	             
+                body {padding-top: 60px!important;}
+	             
+	            .shiny-output-error { visibility: hidden; }
+	            
+	            .shiny-output-error:before { visibility: hidden; }
+                "))
    ),
 	
                
   tabPanel("About",
   fluidRow(
   column(width=10,offset=1,
-  HTML(
-  '<p>The source data is <em>the epidemiology.csv</em> file, obtained from 
+  HTML('<p>The source data is <em>the epidemiology.csv</em> file, obtained from 
   <a href="https://github.com/GoogleCloudPlatform/covid-19-open-data">covid-19-open-data</a>, 
   with 12,525,825 rows and 10 columns, each with the following column names:<p>
   
@@ -84,21 +95,21 @@ ui<-navbarPage(
   the two-letter abbreviation can be transformed into the country name.</p>
   <p>For simplicity, we have selected only 6 representative countries for this analysis, they are</p>'),
 
- uiOutput('sixCs'),
- 
- tags$br(),
- 
-  HTML('
-  <p>Furthermore, we only use <u>confirmed</u>, <u>deceased</u> and <u>tested</u> data.
-  The first two of these are relatively complete, while <u>tested</u> data are only available for a few countries and certain time periods.</p>
- '),
- 
- HTML('Data manipulation was performed by <a href="https://r-datatable.com/">data.table</a> and 
- visualization was done by <a href="https://ggplot2.tidyverse.org/">ggplot2</a> and <a href="https://plotly.com/r/">plotly</a>.')
+  uiOutput('sixCs'),
   
-  ))),  ####end tab1.1(information)
+  tags$br(),
+ 
+  HTML('<p>Furthermore, we only use <u>confirmed</u>, <u>deceased</u> and <u>tested</u> data.
+       The first two of these are relatively complete, while <u>tested</u> data are only available for a few countries and certain time periods.</p> '),
+ 
+  HTML('<p>Data manipulation was performed by <a href="https://r-datatable.com/">data.table</a> and 
+       visualization was done by <a href="https://ggplot2.tidyverse.org/">ggplot2</a> and <a href="https://plotly.com/r/">plotly</a>.</p>'),
+	   
+  HTML('<p>Finally, we tried to make a prediction/forecast based on time series data of the number of <code>new_confirmed</code> using the ARIMA model.</p>')
   
-  tabPanel("visualization",
+  ))),  ####end tab1 (About)
+  
+  tabPanel("Visualization",
   fluidRow(
   column(3,
   awesomeCheckboxGroup(
@@ -162,101 +173,193 @@ ui<-navbarPage(
   
   fluidRow(
   column(12,withSpinner(plotlyOutput('TSPlot')))
-  
   )
-  ), ####end tab1.1(information)
+  ), ####end tab2(viz)
+  
   
   tabPanel("Data Query",
   dateInput('whichDay',label='Select one day',min='2019-12-31',max='2022-12-31',value='2022-02-02'),
   DTOutput('p3table')
-  )
+  ), ####end tab3(data query)
+  
+  tabPanel("Prediction",
+          fluidRow(column(4,selectInput('CountryPre','which country?',
+          	                choices=c('China(CN)'='CN','United States(US)'='US',
+                                      'Japan(JP)'='JP','Germany(DE)'='DE',
+                                      'United Kingdom(GB)'='GB','India(IN)'='IN'),
+          	                selected='US')),
+          					
+          
+          		   column(4, dateInput("preStartDate", "From which day?",
+                               value = "2020-03-15",
+                               min='2020-03-15',max='2021-10-01')),
+          		  		   
+          		   column(4, numericInput("preNday", "How many days to predict?",
+                             value = 20,
+                             min=3,max=80))
+          ),
+          
+          tags$h4('Forecast plot'),
+          fluidRow(column(12,withSpinner(plotlyOutput('predictionPlot')),offset=0)), ##Output
+          tags$h4('Forecast table'),
+          fluidRow(column(10,withSpinner(DTOutput('predictionTable')),offset=1)) ##Output
+  ), ##end of tab 4(prediction)
+  
+  tabPanel("Conclusion",
+   fluidRow(
+   column(width=10,offset=1,
+    HTML('Here we have used the Covid-19 data for some data filtering, descriptive statistical analysis, 
+	time series visualisation and prediction work. The final presentation is in the form of a shiny app, 
+	which allows us to do interactive query and exploration of the data.'),
+	
+	HTML("<ol class='ollist'>
+       <li><b>data.table</b> is an efficient tool for processing data, including filtering, data aggregation, etc; </li>
+       <li>The use of shiny widgets makes the app more interactive, and in addition to the widgets that come with the shiny package, 
+       we use the widgets in the <b>shinyWidgets</b> package, which are more attractive in appearance ; </li>
+       <li><b>plotly</b> itself can generate dynamic graphics, such as displaying information through hover's etc. 
+       Also its compatibility with the <b>ggplot2</b> syntax increases usability; </li>
+       <li>As the dataset is a time series, we took the <code>new_confirmed</code> cases and made a forecast using the ARIMA model, 
+       while we used plotly to present the forecast results. 
+       We note, of course, that the prediction is not accurate because it is based only on the time series and 
+       ignores other variables (e.g. vaccination status, epidemic prevention and control, etc.).</li>
+       </ol>")
+	
+  )))  ###end of tab 5(conclusion)
 )
 
+###shiny server logic
 
 server<-function(input,output,session)
 {
-
+####info of six countries
 output$sixCs<-renderUI({
-flextable(countries[,2:1]) %>% 
-autofit() %>%
-theme_vanilla() %>%
-htmltools_value()
+   flextable(countries[,2:1]) %>% 
+      autofit() %>%
+      theme_vanilla() %>%
+      htmltools_value()
 })
 
-
+####info of table on tab3(data query)
 output$p3table<-renderDT({
-oneday<-dat[date==as.Date(input$whichDay),]
-oneday<-oneday[,2:8]
-oneday<-countries[oneday,on=.(location_key)][,!'location_key']
-
-
-
-sketch <- htmltools::withTags(table(
-  class = 'display',
-  thead(
-    tr(
-	  th(rowspan = 2, 'Country'),
-      th(colspan = 3, 'New',style='text-align:center'),
-      th(colspan = 3, 'Cumulative',style='text-align:center')
-    ),
-    tr(
-      lapply(rep(c('Confirmed', 'Deceased','Tested'), 2), th)
-    )
-  )
-))
-
-
-datatable(oneday,rownames=F,container = sketch,options=list(dom='t',  initComplete = JS(
-    "function(settings, json) {",
-    "$(this.api().table().header()).css({'background-color': '#CCFFFF', 'color': '#34282C'});",
-    "}"))) %>%
-formatRound(names(oneday)[-1],digits=0)
-
-
+     oneday<-dat[date==as.Date(input$whichDay),]
+     oneday<-oneday[,2:8]
+     oneday<-countries[oneday,on=.(location_key)][,!'location_key']
+     
+     sketch <- htmltools::withTags(table(
+       class = 'display',
+       thead(
+         tr(
+     	  th(rowspan = 2, 'Country'),
+           th(colspan = 3, 'New',style='text-align:center'),
+           th(colspan = 3, 'Cumulative',style='text-align:center')
+         ),
+         tr(
+           lapply(rep(c('Confirmed', 'Deceased','Tested'), 2), th)
+         )
+       )
+     ))
+     
+     
+     datatable(oneday,rownames=F,container = sketch,options=list(dom='t', initComplete = JS(
+         "function(settings, json) {",
+         "$(this.api().table().header()).css({'background-color': '#CCFFFF', 'color': '#34282C'});",
+         "}"))) %>%
+     formatRound(names(oneday)[-1],digits=0)
 })
 
 
+####info of tab2 (visualization)
 output$TSPlot<-renderPlotly({
-
-#### time series
-col1<-paste(tolower(input$whichFirm),tolower(input$whichStat),sep="_")
-col2<-input$peroidBy
-cons<-input$whichCountry
-colss<-c(col1,col2,'location_key')
-plot.data<-dat[location_key %in% cons,..colss]
-names(plot.data)<-c('STAT','SPAN','REGION')
-plot.data<-plot.data[,.(STAT=sum(STAT)),.(SPAN,REGION)]
-
-p1<-ggplot(plot.data,aes(x=SPAN,y=STAT,colour=REGION,group=REGION))+
-    geom_point(size=0.8)+
-    geom_line()+
-    theme_bw()+
-    #guides(x=guide_axis(angle=60))+
-    labs(x=paste0('Time Period (',input$peroidBy,")"),
-	y=paste0('Count (',input$whichFirm,")"),
-	title=paste(input$whichFirm,input$whichStat,'at',input$peroidBy,'Level')
-     )
-
-if(input$peroidBy =='Week')
-{
-bs<-plot.data[,unique(grep('(01|05|10|15|25|20|30|35|40|45)$',SPAN,value=T))]
-p1<-p1+scale_x_discrete(breaks=bs)
-}
-
-if(input$peroidBy =='Day')
-{
-bs<-plot.data[,unique(grep('(01|10|20)$',SPAN,value=T))]
-p1<-p1+scale_x_date(date_breaks = "1 month", date_labels = "%Y-%m-%d",expand=expansion(add=10))
-}
-
-
-if(input$wantlog) p1<-p1+scale_y_continuous(trans='log1p')
-
-ggplotly(p1,tooltip=c('x','y','color'),height=450) %>%
-layout(xaxis=list(tickangle=-60))
+          #### time series plot
+          col1<-paste(tolower(input$whichFirm),tolower(input$whichStat),sep="_")
+          col2<-input$peroidBy
+          cons<-input$whichCountry
+          colss<-c(col1,col2,'location_key')
+          plot.data<-dat[location_key %in% cons,..colss]
+          names(plot.data)<-c('STAT','SPAN','REGION')
+		  
+          if(input$peroidBy!='Day') 
+		  {
+		  plot.data<-if(input$whichFirm=='Cumulative')
+		  plot.data[,.(STAT=tail(STAT,1)),.(SPAN,REGION)] else plot.data[,.(STAT=sum(STAT)),.(SPAN,REGION)]
+		  }
+          
+          p1<-ggplot(plot.data,aes(x=SPAN,y=STAT,colour=REGION,group=REGION))+
+              geom_point(size=0.8)+
+              geom_line()+
+              theme_bw()+
+              #guides(x=guide_axis(angle=60))+
+              labs(x=paste0('Time Period (',input$peroidBy,")"),
+          	y=paste0('Count (',input$whichFirm,")"),
+          	title=paste(input$whichFirm,input$whichStat,'at',input$peroidBy,'Level')
+               )
+          
+          if(input$peroidBy =='Week')
+          {
+          bs<-plot.data[,unique(grep('(01|05|10|15|25|20|30|35|40|45)$',SPAN,value=T))]
+          p1<-p1+scale_x_discrete(breaks=bs)
+          }
+          
+          if(input$peroidBy =='Day')
+          {
+          bs<-plot.data[,unique(grep('(01|10|20)$',SPAN,value=T))]
+          p1<-p1+scale_x_date(date_breaks = "1 month", date_labels = "%Y-%m-%d",expand=expansion(add=10))
+          }
+          
+          
+          if(input$wantlog) p1<-p1+scale_y_continuous(trans='log1p')
+          
+          ggplotly(p1,tooltip=c('x','y','color'),height=450) %>%
+          layout(xaxis=list(tickangle=-60))
 
 })
 
+
+###########for prediction
+preForcast<-reactive({
+   pre.data<-dat[location_key==input$CountryPre & date>=input$preStartDate,.(date,new_confirmed)]
+   covid4 = zooreg(pre.data[,.(new_confirmed)], frequency = 1, start = pre.data[1,date])
+   
+   #ncovid <-diff(covid4)
+   #ADF = adf.test(ncovid)
+   #ADF
+   fit = auto.arima(covid4)
+   #fit
+   fore.fit<-forecast(fit,input$preNday)
+   
+   fore.fitDT<-as.data.frame(fore.fit)
+   setDT(fore.fitDT)
+   list(covid4,fore.fitDT,pre.data)
+})
+
+
+output$predictionPlot<-renderPlotly({
+   covid4<-preForcast()[[1]]
+   fore.fitDT<-preForcast()[[2]]
+   pre.data<-preForcast()[[3]]
+   
+   fore.days<-tail(seq(as.IDate(tail(index(covid4),1)),by='1 day',length.out=input$preNday+1),-1)
+   fore.fitDT[,date:=fore.days]
+   
+   ppre<-ggplot(pre.data,aes(x=date,y=new_confirmed))+
+       geom_line(group='a')+
+       theme_bw()+
+       scale_x_date(date_breaks = "1 month", date_labels = "%Y-%m",expand=expansion(add=5))+
+	   scale_y_continuous(labels = scales::comma)+
+       theme(axis.text.x=element_text(angle=60,hjust=1,vjust=1))+
+   	geom_smooth(aes(x=date,y=`Point Forecast`,ymin=`Lo 80`,ymax=`Hi 80`),
+   	data=fore.fitDT,color='red',inherit.aes=F,stat='identity')+
+   	geom_smooth(aes(x=date,y=`Point Forecast`,ymin=`Lo 95`,ymax=`Hi 95`),
+   	data=fore.fitDT,color='red',inherit.aes=F,stat='identity')+
+   	labs(x='')
+   
+   ggplotly(ppre)
+})
+
+output$predictionTable<-renderDT({
+   fore.fitDT<-preForcast()[[2]]
+   datatable(fore.fitDT,rownames=F,options=list(dom='tp')) %>% formatRound(columns=1:5,digits=0)
+})
 
 }
 
