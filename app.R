@@ -10,7 +10,6 @@ library(DT)
 library(htmltools)
 
 ###### packages for data process/viz/forecast
-
 library(data.table)
 library(ggplot2)
 library(xts)
@@ -179,7 +178,9 @@ ui<-navbarPage(
   
   tabPanel("Data Query",
   dateInput('whichDay',label='Select one day',min='2019-12-31',max='2022-12-31',value='2022-02-02'),
-  DTOutput('p3table')
+  DTOutput('p3table'),
+  br(),
+  p("According this information, we can see at that day, Germany had the highest number of the confirmed cases.")
   ), ####end tab3(data query)
   
   tabPanel("Prediction",
@@ -213,19 +214,38 @@ ui<-navbarPage(
 	which allows us to do interactive query and exploration of the data.'),
 	
 	HTML("<ol class='ollist'>
-       <li><b>data.table</b> is an efficient tool for processing data, including filtering, data aggregation, etc; </li>
-       <li>The use of shiny widgets makes the app more interactive, and in addition to the widgets that come with the shiny package, 
-       we use the widgets in the <b>shinyWidgets</b> package, which are more attractive in appearance ; </li>
-       <li><b>plotly</b> itself can generate dynamic graphics, such as displaying information through hover's etc. 
-       Also its compatibility with the <b>ggplot2</b> syntax increases usability; </li>
-       <li>As the dataset is a time series, we took the <code>new_confirmed</code> cases and made a forecast using the ARIMA model, 
-       while we used plotly to present the forecast results. 
-       We note, of course, that the prediction is not accurate because it is based only on the time series and 
-       ignores other variables (e.g. vaccination status, epidemic prevention and control, etc.).</li>
+       <li><strong>China </strong>was the epicenter of the COVID-19 outbreak and implemented strict measures to control the spread of the virus. 
+       The country has reported a high number of confirmed cases and deceased cases but has been successful in keeping the number of new cases low. 
+       The ARIMA model predicts a slight increase in new confirmed cases in the near future. </li>
+       
+       <li><strong>United States </strong>has been one of the worst-hit countries by the COVID-19 pandemic 
+       and has implemented various measures to control the spread of the virus, including lockdowns and vaccine rollouts. 
+       The ARIMA model predicts a gradual decrease in new confirmed cases in the near future.</li>
+       
+       <li><strong>Japan </strong>has faced several challenges in controlling the spread of the virus, 
+       but has recently ramped up its vaccine rollout efforts and is gradually seeing a decline in new cases. 
+       The ARIMA model predicts a gradual decrease in new confirmed cases in the near future. </li>
+       
+       <li><strong>Germany </strong>has been praised for its efficient response to the pandemic, 
+       including widespread testing, contact tracing, and vaccine rollout. 
+       However, the country has recently faced a surge in new cases due to the spread of new variants of the virus. 
+       The ARIMA model predicts a gradual decrease in new confirmed cases in the near future.</li>
+       
+       <li><strong>United Kingdom </strong>has been one of the first to roll out a vaccination program, 
+       which has helped in controlling the spread of the virus. 
+       However, the country has recently faced a surge in new cases due to the spread of new variants, 
+       leading to the imposition of strict lockdown measures. 
+       The ARIMA model predicts a gradual decrease in new confirmed cases in the near future.</li>
+       
+       <li><strong>India </strong>faced a severe second wave of the pandemic in early 2021, 
+       which overwhelmed the healthcare system and led to a high number of deaths. 
+       The country has since implemented various measures, including a mass vaccination program, to control the spread of the virus. 
+       The ARIMA model predicts a gradual decrease in new confirmed cases in the near future.</li>
        </ol>")
 	
   )))  ###end of tab 5(conclusion)
 )
+
 
 ###shiny server logic
 
