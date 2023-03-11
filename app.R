@@ -162,16 +162,20 @@ ui<-navbarPage(
     lib = "glyphicon"))
   ),
   
-  switchInput(
-   inputId = "wantlog",
-   label = "Y log scale", 
-    labelWidth = "80px"
-  )
+  #switchInput(
+  # inputId = "wantlog",
+  # label = "Y log scale", 
+  #  labelWidth = "80px"
+  #)
   )
   ), ####end config row;
   
   fluidRow(
-  column(12,withSpinner(plotlyOutput('TSPlot')))
+  column(12,withSpinner(plotlyOutput('TSPlot',height='450px')))
+  ),
+  
+  fluidRow(
+  column(12,uiOutput('check'))
   )
   ), ####end tab2(viz)
   
@@ -180,7 +184,7 @@ ui<-navbarPage(
   dateInput('whichDay',label='Select one day',min='2019-12-31',max='2022-12-31',value='2022-02-02'),
   DTOutput('p3table'),
   br(),
-  p("According this information, we can see at that day, Germany had the highest number of the confirmed cases.")
+  uiOutput('check22')
   ), ####end tab3(data query)
   
   tabPanel("Prediction",
@@ -203,7 +207,8 @@ ui<-navbarPage(
           tags$h4('Forecast plot'),
           fluidRow(column(12,withSpinner(plotlyOutput('predictionPlot')),offset=0)), ##Output
           tags$h4('Forecast table'),
-          fluidRow(column(10,withSpinner(DTOutput('predictionTable')),offset=1)) ##Output
+          fluidRow(column(10,withSpinner(DTOutput('predictionTable')),offset=1)), ##Output
+		  uiOutput('check33')
   ), ##end of tab 4(prediction)
   
   tabPanel("Conclusion",
@@ -241,7 +246,22 @@ ui<-navbarPage(
        which overwhelmed the healthcare system and led to a high number of deaths. 
        The country has since implemented various measures, including a mass vaccination program, to control the spread of the virus. 
        The ARIMA model predicts a gradual decrease in new confirmed cases in the near future.</li>
-       </ol>")
+       </ol>"),
+	
+	HTML("Regarding the data quality of the epidemiology.csv dataset used in the website, it seems to be of reasonable quality with 12,525,825 rows and 10 columns, 
+	covering a wide range of countries and time periods. However, it's worth noting that the data is self-reported by each country, 
+	and there may be differences in reporting standards and testing rates, which could affect the accuracy of the data. 
+	Additionally, the dataset only includes confirmed cases, deceased cases, and tested data, which may not capture the full impact of the pandemic, 
+	such as the long-term health effects of COVID-19.
+  <br>
+  Overall, the dataset appears to give fair results, but it's important to acknowledge its limitations and potential biases. 
+  For example, certain groups of people, such as those who lack access to healthcare or who are disproportionately affected by COVID-19, 
+  may be underrepresented in the data.
+  <br>
+  Moving forward with the project, one idea could be to expand the analysis to include more variables that capture the full impact of the pandemic, 
+	such as hospitalizations, long-term health effects, and economic impacts. Additionally, it could be useful to compare the COVID-19 situation 
+	in the selected countries to other countries or regions to provide more context and identify potential best practices. 
+	Finally, it may be beneficial to incorporate more data sources to increase the accuracy and reliability of the analysis.")
 	
   )))  ###end of tab 5(conclusion)
 )
@@ -260,11 +280,35 @@ output$sixCs<-renderUI({
 })
 
 ####info of table on tab3(data query)
-output$p3table<-renderDT({
+getT3tableData<-reactive({
      oneday<-dat[date==as.Date(input$whichDay),]
      oneday<-oneday[,2:8]
      oneday<-countries[oneday,on=.(location_key)][,!'location_key']
-     
+	 oneday
+})
+
+
+output$check22<-renderUI({
+oneday<-getT3tableData()
+oneday[order(0-new_confirmed)][1,]->con1
+oneday[order(0-new_deceased)][1,]->con2
+
+tagList(
+tags$p('According this information, we can see at that day, ',
+tags$b(con1[,country]),
+'had the highest number of the confirmed cases (',
+con1[,new_confirmed],').'),
+
+tags$p('And ',
+tags$b(con2[,country]),
+'had the highest number of the deceased cases (',
+con2[,new_deceased],').')
+)
+})
+
+
+output$p3table<-renderDT({
+     oneday<-getT3tableData()
      sketch <- htmltools::withTags(table(
        class = 'display',
        thead(
@@ -289,8 +333,8 @@ output$p3table<-renderDT({
 
 
 ####info of tab2 (visualization)
-output$TSPlot<-renderPlotly({
-          #### time series plot
+getPlotData<-reactive({
+#### time series plot
           col1<-paste(tolower(input$whichFirm),tolower(input$whichStat),sep="_")
           col2<-input$peroidBy
           cons<-input$whichCountry
@@ -303,7 +347,26 @@ output$TSPlot<-renderPlotly({
 		  plot.data<-if(input$whichFirm=='Cumulative')
 		  plot.data[,.(STAT=tail(STAT,1)),.(SPAN,REGION)] else plot.data[,.(STAT=sum(STAT)),.(SPAN,REGION)]
 		  }
-          
+		  
+		  plot.data[,.(REGION,SPAN,STAT)]
+})
+
+output$check<-renderUI({
+plot.data<-getPlotData()
+summ<-plot.data[,.SD[order(-STAT)][1],.(REGION)]
+summ<-countries[summ,on=.(location_key==REGION)]
+
+
+out<-apply(summ,1,function(x) paste('For',x[1],'the peak occurred at',
+input$peroidBy,'of',x[3],'with figures of',x[4]))
+
+tags$ul(
+lapply(out,tags$li)
+)
+})
+
+output$TSPlot<-renderPlotly({
+          plot.data<-getPlotData()
           p1<-ggplot(plot.data,aes(x=SPAN,y=STAT,colour=REGION,group=REGION))+
               geom_point(size=0.8)+
               geom_line()+
@@ -327,7 +390,7 @@ output$TSPlot<-renderPlotly({
           }
           
           
-          if(input$wantlog) p1<-p1+scale_y_continuous(trans='log1p')
+          #if(input$wantlog) p1<-p1+scale_y_continuous(trans='log1p')
           
           ggplotly(p1,tooltip=c('x','y','color'),height=450) %>%
           layout(xaxis=list(tickangle=-60))
@@ -380,6 +443,13 @@ output$predictionTable<-renderDT({
    fore.fitDT<-preForcast()[[2]]
    datatable(fore.fitDT,rownames=F,options=list(dom='tp')) %>% formatRound(columns=1:5,digits=0)
 })
+
+output$check33<-renderUI({
+fore.fitDT<-as.data.table(preForcast()[[2]])
+fore.fitDT[order(-`Point Forecast`)][1]->con3
+tags$p('According to the predicted values, the peak will occur at',tags$b(con3[,date]))
+})
+
 
 }
 

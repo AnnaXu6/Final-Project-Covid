@@ -5,9 +5,9 @@ account: p1yaou-yiling-xu
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 8516119
-bundleId: 6944040
+bundleId: 6944423
 url: https://p1yaou-yiling-xu.shinyapps.io/Final-Project-Covid/
-when: 1678499126.86409
-lastSyncTime: 1678499126.86411
+when: 1678509769.4831
+lastSyncTime: 1678509769.48312
 asMultiple: FALSE
 asStatic: FALSE
